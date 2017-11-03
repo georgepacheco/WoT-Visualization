@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div>TODO write content</div>
+        <script src="assets/js/jquery.min.js"></script>
+        <script>
+            $.get("http://localhost:8080/WoT_Visualization_Interface/sensors/", function (resultado) {
+                $(resultado).each(function (i, obj) {
+                    alert(obj.typeSensor.name);
+                });
+            })
+        </script>
+
+        <div class='col-lg-4 col-md-6'>
+            <!--<div class='panel' id='panelColor" + typeSensor + "'>-->
+                <div class='panel-heading'>
+                    <div class='row'>
+                        <div class='col-xs-2'>
+                            <!--<i class='fa fa-5x' id='panelIcon" + typeSensor + "'></i>-->
+                        </div>
+                        <div class='col-xs-10 text-right'>
+                            <!--<div class='medium' id='lastReadValue" + typeSensor + "'>-->
+                            </div>
+                            <!--<div id='lastReadDate" + typeSensor + "'>-->
+                            </div>
+                        </div>
+                    </div>
+                    <div class='row'>
+                        <div class='col-xs-3'>
+                        </div>
+                        <div class='col-xs-9 text-right'>
+                            <!--<div class='little' id='sensorTypeName" + typeSensor + "'>-->
+                            </div>
+                        </div>
+<!--                    </div>
+                </div>-->
+                <a href='#clusterDetails' data-toggle='collapse' onclick='loadSensors(\"" + clustersType[i].sensors + "\", \"" + sensorDefinition[0].chartLabel + "\");'>
+                    <div class='panel-footer'>
+                        <span class='pull-left'>View Details</span>
+                        <span class='pull-right'><i class='fa fa-arrow-circle-right'></i></span>
+                        <div class='clearfix'>
+                        </div>
+                    </div>
+                </a>
+<!--            </div>
+        </div>-->
+    </body>
+
+</html>

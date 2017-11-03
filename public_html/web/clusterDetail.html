@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">        
+        <link rel="stylesheet" href="dist/fonts/pe-icon-set-weather/css/pe-icon-set-weather.css">
+
+        <!-- Optional - Adds useful class to manipulate icon font display -->
+        <link rel="stylesheet" href="dist/fonts/pe-icon-set-weather/css/helper.css">
+
+        <link rel="stylesheet" href="dist/css/morris.css">
+        <!-- daterange picker -->
+        <link rel="stylesheet" href="dist/css/daterangepicker.css">
+        <style>
+            #listSensors a:hover {               
+                background-color: #eeeeee;
+            }
+        </style>
+    </head>
+    <body>
+
+        <script type="text/javascript">
+            function loadDetails() {
+
+                // Pega na sessão lista de sensores exitente no cluster
+                var clusterSensors = JSON.parse(sessionStorage.cluster);
+                var clustersType = [];
+
+                // Verifica cada sensor e seu tipo. Caso não exista cria um novo tipo de sensor e o adiciona. 
+                // Do contrário só adiciona o sensor ao grupo específico
+                for (i = 0; i < clusterSensors.length; i++) {
+                    var cType = new Object();
+                    cType.type = clusterSensors[i].typeSensor.id;
+                    if (i == 0) {
+                        cType.sensors = [clusterSensors[i]];
+                        clustersType.push(cType);
+                    } else {
+                        var x = $.grep(clustersType, function (e) {
+                            return e.type === clusterSensors[i].typeSensor.id;
+                        });
+                        if (x.length != 0) {
+                            x[0].sensors.push(clusterSensors[i]);
+                        } else {
+                            cType.sensors = [clusterSensors[i]];
+                            clustersType.push(cType);
+                        }
+                    }
+                }
+
+                for (i = 0; i < clustersType.length; i++) {
+                    var sensorDefinition = $.grep(definitions, function (e) {
+                        return e.typeSensor === clustersType[i].type;
+                    });
+
+                    // Calcula a média dos valores (mais recente) de um grupo de sensores do mesmo tipo
+                    var avgRead = 0;
+                    var sensorDate;
+                    for (j = 0; j < clustersType[i].sensors.length; j++) {
+                        var readData = getLastSensorRead(clustersType[i].sensors[j].name);
+                        var lastRead = parseFloat(readData[0].read);
+                        sensorDate = readData[0].date;
+                        avgRead += lastRead;
+                    }
+                    avgRead /= j;
+                    avgRead = $.number(avgRead, 2, ',', '.');
+                    var sensorUnit = getSymbolUnit(sensorDefinition[0].unit);
+                    var typeSensor = clustersType[i].type.split("#")[1];
+                    sensorDate = $.format.date(sensorDate, 'yyyy/MM/dd HH:mm:ss');
+//                    alert(clustersType[i].sensors[0].name);
+                    var x = JSON.stringify(clustersType[i].sensors);
+                    
+                    $('#clusterSensors').append("<div class='col-lg-4 col-md-6'><div class='panel' id='panelColor" + typeSensor + "'><div class='panel-heading'><div class='row'><div class='col-xs-2'><i class='fa fa-5x' id='panelIcon" + typeSensor + "'></i></div><div class='col-xs-10 text-right'><div class='medium' id='lastReadValue" + typeSensor + "'></div><div id='lastReadDate" + typeSensor + "'></div></div></div><div class='row'><div class='col-xs-3'></div><div class='col-xs-9 text-right'><div class='little' id='sensorTypeName" + typeSensor + "'></div></div></div></div><a href='#clusterDetails' onclick='loadSensors(" + x + ", \"" + sensorDefinition[0].chartLabel + "\");'><div class='panel-footer'><span class='pull-left'>View Details</span><span class='pull-right'><i class='fa fa-arrow-circle-right'></i></span><div class='clearfix'></div></div></a></div></div>");
+                    $("#lastReadValue" + typeSensor).append(avgRead + " " + sensorUnit);
+                    $("#lastReadDate" + typeSensor).append(sensorDate);
+                    $('#panelColor' + typeSensor).addClass("panel-" + sensorDefinition[0].panelColor);
+                    $('#sensorTypeName' + typeSensor).append("Avg " + sensorDefinition[0].label);
+                    $('#panelIcon' + typeSensor).addClass(sensorDefinition[0].icon);
+                }
+            }
+
+            function loadSensors(s, chartLabel) {
+                $("#clusterDetails").show();
+                $("#listSensors").empty();
+                for (i = 0; i < s.length; i++) {
+                    var y = JSON.stringify(s[i]);
+                    $("#listSensors").append($("<li>").append(
+                            $("<a>").attr({"href": "#listSensors", "onclick": "loadChart(" + y + ", '" + chartLabel + "')"}).html(
+                            s[i].name)));
+                }
+            }
+
+            function loadChart(sensor, chartLabel) {                
+                sessionStorage.sensor = JSON.stringify(sensor);
+                var readings = getSensorReadings(sensor.name);
+                createAreaChart(JSON.stringify(readings), chartLabel);
+            }
+        </script>
+        <!--<div id="page-wrapper" style="min-height: 274px;">-->
+        <div class="row">
+            <div class="col-lg-12">
+                <h3 class="page-header" id="clusterName" style="color:#868789">Cluster</h3>
+            </div>            
+        </div>
+        <div class="row" id="clusterSensors"></div>
+
+        <div id="clusterDetails" style="display:none">
+            <div class="row">
+                <div class="col-lg-5">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <i class="fa fa-bar-chart-o fa-fw"></i>Sensors
+                        </div>                     
+                        <div class="panel-body">
+                            <div >
+                                <ul class='nav in' id="listSensors">
+
+                                </ul>
+                            </div>
+                        </div>                                       
+                    </div>  
+                </div>
+                <div class="col-lg-7">
+                    <div class="panel panel-default " id="areaChartPanel">
+                        <div class="panel-heading">
+                            <i class="fa fa-bar-chart-o fa-fw"></i> Area Chart
+                            <div class="pull-right">
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        Filter: <input type="text" name="daterange" id="daterange" size="45"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>          
+
+                        <div class="panel-body">
+                            <div id="details-area-chart"></div>
+                        </div>                                       
+                    </div>         
+                </div>
+            </div>
+        </div>
+        <!--</div>-->
+        <!-- Morris Charts JavaScript -->
+        <script src="dist/js/raphael.min.js"></script>
+        <script src="dist/js/morris.min.js"></script>
+        <script src="dist/js/moment.min.js"></script>
+        <script src="dist/js/daterangepicker.js"></script>
+        <script>
+            function createAreaChart(data, label) {
+                $("#details-area-chart").html("");
+                new Morris.Area({
+                    element: 'details-area-chart',
+                    data: JSON.parse(data),
+                    xkey: 'date',
+                    ykeys: ['read'],
+                    labels: [label],
+                    pointSize: 2,
+                    hideHover: 'auto',
+                    resize: true,
+                    dateFormat: function (x) {
+                        return $.format.date(new Date(x), 'yyyy/MM/dd HH:mm:ss');
+                    }
+                });
+            }
+
+            $(function () {
+                $('#daterange').daterangepicker({
+                    timePicker: true,
+                    timePicker24Hour: true,
+                    timePickerIncrement: 1,
+                    locale: {
+                        format: 'YYYY-MM-DD HH:mm'
+                    }
+                },
+                        function (start, end) {
+                            var sensor = JSON.parse(sessionStorage.sensor);
+                            var readings = getSensorReadingsByDate(sensor.name, start.format("YYYY-MM-DDTHH:mm:ss"), end.format("YYYY-MM-DDTHH:mm:ss"));
+                            var sensorDefinition = $.grep(definitions, function (e) {
+                                return e.typeSensor === sensor.typeSensor.id;
+                            });
+                            createAreaChart(JSON.stringify(readings), sensorDefinition[0].chartLabel);
+
+                        }
+                );
+            });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script> function x(){
+            $('#clusterSensors').append("<div class='col-lg-4 col-md-6'><div class='panel' id='panelColor" + typeSensor + "'>\n\
+<div class='panel-heading'><div class='row'>\n\
+<div class='col-xs-2'><i class='fa fa-5x' id='panelIcon" + typeSensor + "'></i></div>\n\
+<div class='col-xs-10 text-right'><div class='medium' id='lastReadValue" + typeSensor + "'></div><div id='lastReadDate" + typeSensor + "'></div></div></div><div class='row'><div class='col-xs-3'></div><div class='col-xs-9 text-right'><div class='little' id='sensorTypeName" + typeSensor + "'></div></div></div></div><a href='#'><div class='panel-footer'><span class='pull-left'>View Details</span><span class='pull-right'><i class='fa fa-arrow-circle-right'></i></span><div class='clearfix'></div></div></a></div></div>");
+            
+            var panelColor = "panelColor"+typeSensor;
+            var panelIcon = "panelIcon"+typeSensor;
+            $("#clusterSensors").append("<div>").attr("class","col-lg-4 col-md-6").
+                    append("<div>").attr({"class":"panel", "id": panelColor}).
+                    append("<div>").attr("class", "panel-heading").
+                    append("<div>").attr("class", "row").
+                    append("<div>").attr("class","col-xs-2").
+                    append("<i>").attr({"class":"fa fa-5x", "id":panelIcon})
+            
+            $("#listSensors").append($("<li>").append(
+                            $("<a>").attr({"href": "#", "style": "color: #000", "onclick": "loadChart('" + sensors[i] + "', '" + chartLabel + "')"}).html(
+                            sensors[i].split("#")[1])));
+            }</script>
+    </head>
+</html>

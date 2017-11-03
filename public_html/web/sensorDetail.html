@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">        
+        <link rel="stylesheet" href="dist/fonts/pe-icon-set-weather/css/pe-icon-set-weather.css">
+
+        <!-- Optional - Adds useful class to manipulate icon font display -->
+        <link rel="stylesheet" href="dist/fonts/pe-icon-set-weather/css/helper.css">
+
+        <link rel="stylesheet" href="dist/css/morris.css">
+
+        <!-- daterange picker -->
+        <link rel="stylesheet" href="dist/css/daterangepicker.css">
+    </head>
+    <body>
+
+        <script type="text/javascript">
+
+            function loadDetails() {
+                var sensor = JSON.parse(sessionStorage.sensor);
+                var sensorName = sensor.name;
+                var typeSensor = sensor.typeSensor.name;
+                var sensorDefinition = $.grep(definitions, function (e) {
+                    return e.typeSensor === sensor.typeSensor.id;
+                });
+                $("#sensorName").append(typeSensor + ": " + sensorName);
+                var lastRead = getLastSensorRead(sensor.name);
+                var sensorValue = $.number(lastRead[0].read, 2, ',', '.');
+                var sensorUnit = getSymbolUnit(sensorDefinition[0].unit);
+                $("#lastReadValue").append(sensorValue + " " + sensorUnit);
+                var sensorDate = $.format.date(lastRead[0].date, 'yyyy/MM/dd HH:mm:ss');
+                $("#lastReadDate").append(sensorDate);
+                $('#panelColor').addClass("panel-" + sensorDefinition[0].panelColor);
+                $('#areaChartPanel').addClass("panel-" + sensorDefinition[0].panelColor);
+                $('#panelIcon').addClass(sensorDefinition[0].icon);
+
+                var readings = getSensorReadings(sensor.name);
+
+                createAreaChart(JSON.stringify(readings), sensorDefinition[0].chartLabel);
+            }
+        </script>
+
+        <div class="col-lg-12">
+            <h3 class="page-header" id="sensorName" style="color:#868789"></h3>
+        </div>
+
+        <div class="col-lg-5 col-md-6">
+            <div class="panel" id="panelColor">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-2">
+                            <i class="fa fa-5x" id="panelIcon"></i>
+                        </div>
+                        <div class="col-xs-10 text-right">
+                            <div class="huge" id="lastReadValue"></div>
+                            <div id="lastReadDate"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="panel" id="areaChartPanel">
+                <div class="panel-heading">
+                    <i class="fa fa-bar-chart-o fa-fw"></i> Area Chart 
+                    <div class="pull-right">
+                        <div class="form-group">
+                            <div class="input-group">
+                                Filter: <input type="text" name="daterange" id="daterange" size="45"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- /.panel-heading -->
+                <div class="panel-body">
+                    <div id="morris-area-chart"></div>
+                </div>                  
+                <!-- /.panel-body -->
+            </div>         
+        </div>
+
+        <!-- Morris Charts JavaScript -->
+        <script src="dist/js/raphael.min.js"></script>
+        <script src="dist/js/morris.min.js"></script>
+        <script src="dist/js/moment.min.js"></script>
+        <script src="dist/js/daterangepicker.js"></script>
+
+        <script>
+            function createAreaChart(data, label) {
+                $("#morris-area-chart").html("");
+                new Morris.Area({
+                    element: 'morris-area-chart',
+                    data: JSON.parse(data),
+                    xkey: 'date',
+                    ykeys: ['read'],
+                    labels: [label],
+//                    labels: ['iPhone', 'iPad', 'iPod Touch'],
+                    pointSize: 2,
+                    hideHover: 'auto',
+                    resize: true,
+                    dateFormat: function (x) {
+                        return $.format.date(new Date(x), 'yyyy/MM/dd HH:mm:ss');
+                    }
+                });
+            }
+
+            $(function () {
+                $('#daterange').daterangepicker({
+                    timePicker: true,
+                    timePicker24Hour: true,
+                    timePickerIncrement: 1,
+                    locale: {
+                        format: 'YYYY-MM-DD HH:mm'
+                    }
+                },
+                        function (start, end) {
+                            var sensor = JSON.parse(sessionStorage.sensor);
+                            var readings = getSensorReadingsByDate(sensor.name, start.format("YYYY-MM-DDTHH:mm:ss"), end.format("YYYY-MM-DDTHH:mm:ss"));
+                            var sensorDefinition = $.grep(definitions, function (e) {
+                                return e.typeSensor === sensor.typeSensor.id;
+                            });
+                            createAreaChart(JSON.stringify(readings), sensorDefinition[0].chartLabel);
+                        }
+                );
+            });
+        </script>
+    </body>
+</html>

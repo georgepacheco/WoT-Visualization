@@ -1,0 +1,34 @@
+[
+    {
+        "typeSensor": "http://purl.org/iot/vocab/m3-lite#PressureSensor",
+        "icon": "fa-tachometer",
+        "panelColor": "info",
+        "unit": "http://purl.org/iot/vocab/m3-lite#Millibar",
+        "chartLabel": "pressure",
+        "label": "Pressure"
+    },
+    {
+        "typeSensor": "http://purl.org/iot/vocab/m3-lite#HumiditySensor",
+        "icon": "pe-is-w-drop-percentage",
+        "panelColor": "yellow",
+        "unit": "http://purl.org/iot/vocab/m3-lite#Percent",
+        "chartLabel": "humidity",
+        "label": "Humidity"
+    },
+    {
+        "typeSensor": "http://purl.org/iot/vocab/m3-lite#AirThermometer",
+        "icon": "pe-is-w-thermometer-2",
+        "panelColor": "danger",
+        "unit": "http://purl.org/iot/vocab/m3-lite#DegreeCelsius",
+        "chartLabel": "temperature",
+        "label": "Temperature"
+    },
+    {
+        "typeSensor": "http://purl.org/iot/vocab/m3-lite#DewPointSensor",
+        "icon": "pe-is-w-thermometer-2",
+        "panelColor": "warning",
+        "unit": "http://purl.org/iot/vocab/m3-lite#DegreeCelsius",
+        "chartLabel": "temperature",
+        "label": "Dew Point"
+    }
+]

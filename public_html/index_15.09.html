@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+    <head>
+
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="">
+        <meta name="author" content="">
+
+        <title>WoT Visualization Dashboard</title>
+
+        <!-- Bootstrap Core CSS -->
+        <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+
+        <!-- MetisMenu CSS -->
+        <link href="assets/css/metisMenu.min.css" rel="stylesheet">
+
+        <!-- Custom CSS -->
+        <link href="assets/css/sb-admin-2.css" rel="stylesheet">
+
+        <!-- Custom Fonts -->
+        <link href="assets/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+        <!-- Timeline CSS -->
+        <link href="assets/css/timeline.css" rel="stylesheet">        
+        <style>
+
+            #map {
+                min-height: 560px;
+                /*border: 1px solid #ccc;*/
+                border:none;
+            }
+        </style>
+    </head>
+
+    <body>
+
+        <div id="wrapper">
+
+            <!-- Navigation -->
+            <nav class="navbar navbar-default navbar-static-top" role="navigation" style="margin-bottom: 0; background-color: #bf3e11">
+                <div class="navbar-header">                
+                    <a class="navbar-brand" href="#" style="color:#fff">WoT Data Visualization</a>                   
+                </div>
+            </nav>
+
+            <!-- Page Content -->
+            <!--            <div id="page-wrapper">-->
+            <div class="container-fluid">
+                <div class="row" style="background-color: #eee;">                         
+                    <div class="col-lg-3">     
+                        <ul class="nav in" id="side-menu">
+                            <li>
+                                <a href="index.html" style="color: #000"><i class="fa fa-dashboard fa-fw"></i> WoT Dashboard</a>
+                            </li>
+                            <li class="">
+                                <a href="#" style="color: #000"><i class="fa fa-database fa-fw"></i> Endpoints<span class="fa arrow"></span></a>
+                                <ul class="nav nav-second-level collapse" aria-expanded="false" style="height: 0px;">
+                                    <li class="">
+                                        <a href="#" style="color: #000">Endpoint 01 <span class="fa arrow"></span></a>
+                                        <ul class="nav nav-third-level collapse" aria-expanded="false" style="height: 0px;">
+                                            <li id="sensorTypes">
+
+                                            </li>                    
+                                        </ul>
+                                        <!-- /.nav-third-level -->
+                                    </li>
+                                </ul>
+                                <!-- /.nav-second-level -->
+                            </li>
+                            <li class="">
+                                <a href="#" style="color: #000; font-size: 12px;"> Add new endpoint</a>
+                            </li>
+                        </ul>
+                        <!--<a href="#" style="color: #000">+ add Endpoint</a>--> 
+                    </div>
+                    <div class="col-lg-9" style="background-color: #fff;">
+                        <div id="map"></div>                        
+                        <div id="details"></div>                        
+                    </div>                    
+                </div>
+                <!-- /.row -->
+            </div>           
+        </div>       
+
+        <!-- Modal -->
+        <div id="sensorModal" class="modal fade" role="dialog">
+            <div class="modal-dialog modal-lg">
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title"></h4>
+                    </div>
+                    <div class="modal-body edit-content">
+                        <div class="row" id="readValues"></div>
+                        <div class="row" id="chart"></div>
+                    </div>
+                    <!--                    <div class="modal-footer">
+                                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        </div>-->
+                </div>
+
+            </div>
+        </div>
+
+        <!-- jQuery -->
+        <script src="assets/js/jquery.min.js"></script>
+        <script src="assets/js/jquery.sparql.js"></script>
+        <script src="assets/js/jquery-dateFormat.min.js"></script>
+        <script src="assets/js/jquery.number.min.js"></script>
+        <script src="assets/js/d3.min.js"></script>
+
+        <!-- Bootstrap Core JavaScript -->
+        <script src="assets/js/bootstrap.min.js"></script>
+
+        <!-- Metis Menu Plugin JavaScript -->
+        <script src="assets/js/metisMenu.min.js"></script>
+
+        <!-- Custom Theme JavaScript -->
+        <script src="assets/js/sb-admin-2.js"></script>
+
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC_6aK2IyqFVLlUSMgnUmdCoS1yklMN-no&signed_in=true"
+                async defer>
+        </script>  
+        <script type="text/javascript" src="assets/js/markerclusterer.js">
+        </script>
+
+        <script>
+
+            var definitions = [];
+            $.getJSON("sensordefinitions.json", function (data) {
+                $.each(data, function (key, val) {
+                    definitions.push(val);
+                });
+            });
+
+            map = null;
+            markerCluster = null;
+            sensorFilters = null;
+            var sensors = [];
+            sensorsMarkers = [];
+            var sensorTypes = [];
+            var queryAllSensors = [
+                "SELECT ?sensor ?typeSensor ?latitude ?longitude",
+                "WHERE {",
+                "{?sensor  rdf:type  m3:HumiditySensor}",
+                "union",
+                "{?sensor  rdf:type  m3:DewPointSensor}",
+                "union",
+                "{?sensor  rdf:type  m3:PressureSensor}",
+                "union",
+                "{?sensor  rdf:type  m3:AirThermometer}.",
+                "?sensor rdf:type ?typeSensor . ",
+                "?sensor iot-lite:hasCoverage ?coverage .",
+                "?coverage geo:location ?point .",
+                "?point geo:lat ?latitude .",
+                "?point geo:long ?longitude .",
+                "}"
+            ].join(" ");
+            // realiza consulta na base
+            var jsonData = $.fn.query(queryAllSensors);
+            // adiciona no vetor os tipos de sensores disponíveis na base
+//            $(jsonData).each(function (i, obj) {
+//                if ($.inArray(obj.typeSensor.value.split("#")[1], sensorTypes) === -1) {
+//                    sensorTypes.push(obj.typeSensor.value.split("#")[1]);
+//                }
+//                sensors.push(obj);
+//            });
+
+//            var panelClasses = ['info', 'success', 'warning', 'danger', 'yellow', 'red', 'green'];
+//            var panelClasses = ['yellow', 'red', 'green', 'primary', 'info', 'success', 'warning', 'danger'];
+//            var colorPath = ['#31708F', '#3c763d', '#8A6D3B', '#a94442', '#f0ad4e', '#d9534f', '#5cb85c'];
+
+            $(jsonData).each(function (i, obj) {
+                if ($.grep(sensorTypes, function (e) {
+                    return e.value == obj.typeSensor.value.split("#")[1];
+                }).length <= 0) {
+                    var myObj = new Object();
+                    myObj.value = obj.typeSensor.value.split("#")[1];
+//                    myObj.colorPanel = panelClasses.splice(0, 1);
+//                    myObj.colorPath = colorPath.splice(0, 1);
+                    sensorTypes.push(myObj);
+                }
+                sensors.push(obj);
+            });
+            addSensorTypes();
+            function addSensorTypes() {
+                $(sensorTypes).each(function (i, obj) {
+                    $("#sensorTypes").append("<div class='checkbox'><label><input type='checkbox' name='sensors' value='" + obj.value + "' checked>" + obj.value + " Sensors</label></div>");
+                });
+            }
+
+            function initMap() {
+                /* Localização padrão. Caso localização atual não esteja disponível (Brasil) */
+                var center = new google.maps.LatLng(-12.167343, -51.806999);
+                map = new google.maps.Map(document.getElementById('map'), {
+                    //center: center,
+                    zoom: 4,
+                    minZoom: 3,
+                    mapTypeId: google.maps.MapTypeId.HYBRID,
+                    mapTypeControl: true
+                });
+                // Try HTML5 geolocation.
+//                if (navigator.geolocation) {
+//                    navigator.geolocation.getCurrentPosition(function (position) {
+//                        center = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+//                    });
+//                }
+                map.setCenter(center);
+                sensorFilters = $('[name = "sensors"]');
+                for (var i = 0; i < sensorFilters.length; i++) {
+                    google.maps.event.addDomListener(sensorFilters[i], 'click', filterMarkers);
+                }
+                showMarkers();
+            }
+
+            function showMarkers()
+            {
+                sensorsMarkers = [];
+                filters = [];
+                for (var i = 0; i < sensorFilters.length; i++) {
+                    if (sensorFilters[i].checked) {
+                        filters.push(sensorFilters[i]);
+                    }
+                }
+
+                if (markerCluster) {
+                    markerCluster.clearMarkers();
+                }
+
+                for (var i = 0; i < sensors.length; i++) {
+                    var typeSensor = sensors[i].typeSensor.value.split("#")[1];
+                    if ($.grep(filters, function (e) {
+                        return e.value == typeSensor;
+                    }).length > 0) {
+
+                        var marker = new google.maps.Marker({
+                            position: new google.maps.LatLng(sensors[i].latitude.value, sensors[i].longitude.value),
+                            icon: 'dist/images/' + typeSensor + '.png',
+                            title: sensors[i].sensor.value,
+                            id: i,
+                            typeSensor: typeSensor
+                        });
+                        new google.maps.event.addListener(marker, 'click', function () {
+                            openModalSensor(this);
+                        });
+                        sensorsMarkers.push(marker);
+                    }
+                }
+                clustering();
+            }
+
+            clearMap = function () {
+                for (var i = 0; i < sensorsMarkers.length; i++) {
+                    var marker = sensorsMarkers[i];
+                    marker.setMap(null);
+                }
+            };
+            filterMarkers = function () {
+                clearMap();
+                showMarkers();
+            };
+
+            getLastSensorRead = function (sensor) {
+                var query = [
+                    "SELECT ?value ?startTimeValue",
+                    "WHERE {",
+                    "<" + sensor + "> ssn:madeObservation ?obs .",
+                    "?obs ssn:observationResult ?sensorOut .",
+                    "?sensorOut ssn:hasValue ?obsValue .",
+                    "?obsValue dul:hasDataValue ?value .",
+                    "?obs ssn:startTime ?startTime . ",
+                    "?startTime dul:hasIntervalDate ?startTimeValue .",
+//                    "?obs ssn:endTime ?endTime . ",
+//                    "?endTime dul:hasIntervalDate ?endTimeValue",
+                    "}ORDER BY DESC(?startTimeValue)",
+                    "LIMIT 1",
+                ].join(" ");
+                var sensorReadings = [];
+                var jsonData = $.fn.query(query);
+                $(jsonData).each(function (i, obj) {
+                    //                    sensorReadings.push(obj);
+                    var myObj = new Object();
+                    myObj.date = new Date(obj.startTimeValue.value);
+                    myObj.read = obj.value.value;
+                    sensorReadings.push(myObj);
+                });
+                return sensorReadings;
+            }
+
+            getSensorReadings = function (sensor) {
+
+                var query = [
+                    "SELECT ?value ?startTimeValue",
+                    "WHERE {",
+                    "<" + sensor + "> ssn:madeObservation ?obs .",
+                    "?obs ssn:observationResult ?sensorOut .",
+                    "?sensorOut ssn:hasValue ?obsValue .",
+                    "?obsValue dul:hasDataValue ?value .",
+                    "?obs ssn:startTime ?startTime . ",
+                    "?startTime dul:hasIntervalDate ?startTimeValue .",
+//                    "?obs ssn:endTime ?endTime . ",
+//                    "?endTime dul:hasIntervalDate ?endTimeValue",
+                    "}ORDER BY DESC(?startTimeValue)",
+                    "LIMIT 100",
+                ].join(" ");
+                var sensorReadings = [];
+                var jsonData = $.fn.query(query);
+                $(jsonData).each(function (i, obj) {
+                    //                    sensorReadings.push(obj);
+                    var myObj = new Object();
+                    myObj.date = new Date(obj.startTimeValue.value);
+                    myObj.read = obj.value.value;
+                    sensorReadings.push(myObj);
+                });
+                return sensorReadings;
+            }
+
+            getSymbolUnit = function (unit) {
+
+                if (unit === "http://purl.org/iot/vocab/m3-lite#DegreeCelsius") {
+                    return '°C';
+                } else if (unit === "http://purl.org/iot/vocab/m3-lite#Percent") {
+                    return '%';
+                } else if (unit === "http://purl.org/iot/vocab/m3-lite#Millibar") {
+                    return 'mBar';
+                }
+            }
+
+            /**
+             * 
+             * @param {type} marker
+             * @returns {undefined}
+             * @author Modal aberto quando click no marcador
+             */
+            function openModalSensor(marker) {
+                var sensor = sensors[parseInt(marker.id)];
+                sessionStorage.sensor = JSON.stringify(sensor);
+//                $("#map").hide();
+                $("#map").load("web/sensorDetail.html", function () {
+                    loadDetails();
+                });
+            }
+
+
+            /**
+             * 
+             * @param {type} marker
+             * @returns {undefined}
+             * @author Modal aberto quando click num cluster
+             */
+            function openModalCluster(cluster) {
+                var clusterMarkers = [];
+                for (i = 0; i < cluster.getMarkers().length; i++) {
+                    var sensor = sensors[parseInt(cluster.getMarkers()[i].id)];
+                    clusterMarkers.push(sensor);
+                }
+                sessionStorage.cluster = JSON.stringify(clusterMarkers);
+                $("#map").load("web/clusterDetail.html", function () {
+                    loadDetails();
+                });
+//                
+//                //                var dt = data[parseInt(marker.title)];
+//                //                var dt = data[parseInt(marker.id)];
+//                $('#myModal').on('show.bs.modal', function (e) {
+//                    var $modal = $(this);
+//                    $.ajax({
+//                        cache: false,
+//                        type: 'POST',
+//                        url: 'clusterModal.php',
+//                        data: {
+//                            'lat': cluster.getCenter().lat(),
+//                            'long': cluster.getCenter().lng(),
+//                            //                            'temp': dt.temperature,
+//                            //                            'umi': dt.umidade
+//                        },
+//                        success: function (d)
+//                        {
+//                            $modal.find('.edit-content').html(d);
+//                            //                            $modal.find('.modal-title').html(dt.title);
+//                        }
+//                    });
+//                });
+//                $("#myModal").modal({backdrop: false});
+            }
+
+            /**
+             * 
+             * @param {type} map
+             * @param {type} markers
+             * @returns {undefined}
+             * @author Função para agrupamento de marcadores
+             */
+            function clustering() {
+                mcOptions = {
+                    imagePath: 'dist/images/m',
+                    zoomOnClick: false,
+                    averageCenter: true,
+                    gridsize: 40
+                };
+                markerCluster = new MarkerClusterer(map, sensorsMarkers, mcOptions);
+                google.maps.event.addListener(markerCluster, 'clusterclick',
+                        function (markerCluster) {
+                            openModalCluster(markerCluster);
+                        });
+//                google.maps.event.addListener(markerCluster, 'mouseover',
+//                        function (markerCluster) {
+//                            alert('olá');
+//                        });
+            }
+
+            /**
+             * 
+             * @param {type} browserHasGeolocation
+             * @param {type} map
+             * @returns {undefined}
+             * @author Tratamento de erro
+             */
+            function handleLocationError(browserHasGeolocation, map) {
+                var infoWindow = new google.maps.InfoWindow({map: map});
+                infoWindow.setPosition(map.getCenter());
+                infoWindow.setContent(browserHasGeolocation ?
+                        'Error: The Geolocation service failed.' :
+                        'Error: Your browser doesn\'t support geolocation.');
+            }
+
+            window.onload = initMap;</script>  
+
+        <script>
+            createAreaChart = function (data) {
+                var svg = d3.select("svg"),
+                        margin = {top: 20, right: 20, bottom: 110, left: 40},
+                margin2 = {top: 280, right: 20, bottom: 30, left: 40},
+                width = +svg.attr("width") - margin.left - margin.right,
+                        height = +svg.attr("height") - margin.top - margin.bottom,
+                        height2 = +svg.attr("height") - margin2.top - margin2.bottom;
+                var parseDate = d3.timeParse("%d %b %Y");
+                var x = d3.scaleTime().range([0, width]),
+                        x2 = d3.scaleTime().range([0, width]),
+                        y = d3.scaleLinear().range([height, 0]),
+                        y2 = d3.scaleLinear().range([height2, 0]);
+                var xAxis = d3.axisBottom(x),
+                        xAxis2 = d3.axisBottom(x2),
+                        yAxis = d3.axisLeft(y);
+                var brush = d3.brushX()
+                        .extent([[0, 0], [width, height2]])
+                        .on("brush end", brushed);
+                var zoom = d3.zoom()
+                        .scaleExtent([1, Infinity])
+                        .translateExtent([[0, 0], [width, height]])
+                        .extent([[0, 0], [width, height]])
+                        .on("zoom", zoomed);
+                var area = d3.area()
+                        .curve(d3.curveMonotoneX)
+                        .x(function (d) {
+                            return x(d.date);
+                        })
+                        .y0(height)
+                        .y1(function (d) {
+                            return y(d.read);
+                        });
+                var area2 = d3.area()
+                        .curve(d3.curveMonotoneX)
+                        .x(function (d) {
+                            return x2(d.date);
+                        })
+                        .y0(height2)
+                        .y1(function (d) {
+                            return y2(d.read);
+                        });
+                svg.append("defs").append("clipPath")
+                        .attr("id", "clip")
+                        .append("rect")
+                        .attr("width", width)
+                        .attr("height", height);
+                var focus = svg.append("g")
+                        .attr("class", "focus")
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+                var context = svg.append("g")
+                        .attr("class", "context")
+                        .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+                x.domain(d3.extent(data, function (d) {
+                    return d.date;
+                }));
+                y.domain(d3.extent(data, function (d) {
+                    return parseInt(d.read);
+                }));
+                x2.domain(x.domain());
+                y2.domain(y.domain());
+                focus.append("path")
+                        .datum(data)
+                        .attr("class", "area")
+                        .attr("d", area);
+                focus.append("g")
+                        .attr("class", "axis axis--x")
+                        .attr("transform", "translate(0," + height + ")")
+                        .call(xAxis);
+                focus.append("g")
+                        .attr("class", "axis axis--y")
+                        .call(yAxis);
+                context.append("path")
+                        .datum(data)
+                        .attr("class", "area")
+                        .attr("d", area2);
+                context.append("g")
+                        .attr("class", "axis axis--x")
+                        .attr("transform", "translate(0," + height2 + ")")
+                        .call(xAxis2);
+                context.append("g")
+                        .attr("class", "brush")
+                        .call(brush)
+                        .call(brush.move, x.range());
+                svg.append("rect")
+                        .attr("class", "zoom")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+                        .call(zoom);
+                function brushed() {
+
+                    if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom")
+                        return; // ignore brush-by-zoom
+                    var s = d3.event.selection || x2.range();
+                    x.domain(s.map(x2.invert, x2));
+                    focus.select(".area").attr("d", area);
+                    focus.select(".axis--x").call(xAxis);
+                    svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
+                            .scale(width / (s[1] - s[0]))
+                            .translate(-s[0], 0));
+                }
+
+                function zoomed() {
+                    if (d3.event.sourceEvent && d3.event.sourceEvent.type === "brush")
+                        return; // ignore zoom-by-brush
+                    var t = d3.event.transform;
+                    x.domain(t.rescaleX(x2).domain());
+                    focus.select(".area").attr("d", area);
+                    focus.select(".axis--x").call(xAxis);
+                    context.select(".brush").call(brush.move, x.range().map(t.invertX, t));
+                }
+
+                function type(d) {
+                    d.date = parseDate(d.date);
+                    d.read = +d.read;
+                    return d;
+                }
+            }
+        </script>
+    </body>
+
+</html>
